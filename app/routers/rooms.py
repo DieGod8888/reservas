@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -25,7 +27,7 @@ def check_unique_name(db: Session, name: str, room_id: int | None = None) -> Non
 
 
 @router.post("", status_code=201, summary="Crea una sala")
-def create_room(data: RoomCreate, db: Session = Depends(get_db)) -> RoomOut:
+def create_room(data: RoomCreate, db: Annotated[Session, Depends(get_db)]) -> RoomOut:
     check_unique_name(db, data.name)
     room = Room(**data.model_dump())
     db.add(room)
@@ -35,17 +37,19 @@ def create_room(data: RoomCreate, db: Session = Depends(get_db)) -> RoomOut:
 
 
 @router.get("", summary="Lista todas las salas")
-def list_rooms(db: Session = Depends(get_db)) -> list[RoomOut]:
+def list_rooms(db: Annotated[Session, Depends(get_db)]) -> list[RoomOut]:
     return db.scalars(select(Room)).all()
 
 
 @router.get("/{room_id}", summary="Obtiene una sala por su id")
-def get_room(room_id: int, db: Session = Depends(get_db)) -> RoomOut:
+def get_room(room_id: int, db: Annotated[Session, Depends(get_db)]) -> RoomOut:
     return get_room_or_404(db, room_id)
 
 
 @router.put("/{room_id}", summary="Actualiza una sala")
-def update_room(room_id: int, data: RoomCreate, db: Session = Depends(get_db)) -> RoomOut:
+def update_room(
+    room_id: int, data: RoomCreate, db: Annotated[Session, Depends(get_db)]
+) -> RoomOut:
     room = get_room_or_404(db, room_id)
     check_unique_name(db, data.name, room_id)
     room.name = data.name
@@ -56,7 +60,7 @@ def update_room(room_id: int, data: RoomCreate, db: Session = Depends(get_db)) -
 
 
 @router.delete("/{room_id}", status_code=204, summary="Elimina una sala")
-def delete_room(room_id: int, db: Session = Depends(get_db)) -> None:
+def delete_room(room_id: int, db: Annotated[Session, Depends(get_db)]) -> None:
     room = get_room_or_404(db, room_id)
     if room.reservations:
         raise HTTPException(status_code=409, detail="La sala tiene reservas")

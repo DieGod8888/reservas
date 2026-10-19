@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -20,7 +21,11 @@ def get_reservation_or_404(db: Session, reservation_id: int) -> Reservation:
 
 
 def check_no_conflict(
-    db: Session, room_id: int, start_time: datetime, end_time: datetime, reservation_id: int | None = None
+    db: Session,
+    room_id: int,
+    start_time: datetime,
+    end_time: datetime,
+    reservation_id: int | None = None,
 ) -> None:
     # Los intervalos se tratan como [inicio, fin): se permite que se toquen.
     query = select(Reservation).where(
@@ -31,11 +36,15 @@ def check_no_conflict(
     if reservation_id is not None:
         query = query.where(Reservation.id != reservation_id)
     if db.scalar(query):
-        raise HTTPException(status_code=409, detail="La sala ya está reservada en ese horario")
+        raise HTTPException(
+            status_code=409, detail="La sala ya está reservada en ese horario"
+        )
 
 
 @router.post("", status_code=201, summary="Crea una reserva")
-def create_reservation(data: ReservationCreate, db: Session = Depends(get_db)) -> ReservationOut:
+def create_reservation(
+    data: ReservationCreate, db: Annotated[Session, Depends(get_db)]
+) -> ReservationOut:
     get_room_or_404(db, data.room_id)
     check_no_conflict(db, data.room_id, data.start_time, data.end_time)
     reservation = Reservation(**data.model_dump())
@@ -46,7 +55,9 @@ def create_reservation(data: ReservationCreate, db: Session = Depends(get_db)) -
 
 
 @router.get("", summary="Lista las reservas, con filtro opcional por sala")
-def list_reservations(room_id: int | None = None, db: Session = Depends(get_db)) -> list[ReservationOut]:
+def list_reservations(
+    db: Annotated[Session, Depends(get_db)], room_id: int | None = None
+) -> list[ReservationOut]:
     query = select(Reservation)
     if room_id is not None:
         query = query.where(Reservation.room_id == room_id)
@@ -54,13 +65,17 @@ def list_reservations(room_id: int | None = None, db: Session = Depends(get_db))
 
 
 @router.get("/{reservation_id}", summary="Obtiene una reserva por su id")
-def get_reservation(reservation_id: int, db: Session = Depends(get_db)) -> ReservationOut:
+def get_reservation(
+    reservation_id: int, db: Annotated[Session, Depends(get_db)]
+) -> ReservationOut:
     return get_reservation_or_404(db, reservation_id)
 
 
 @router.put("/{reservation_id}", summary="Actualiza una reserva")
 def update_reservation(
-    reservation_id: int, data: ReservationCreate, db: Session = Depends(get_db)
+    reservation_id: int,
+    data: ReservationCreate,
+    db: Annotated[Session, Depends(get_db)],
 ) -> ReservationOut:
     reservation = get_reservation_or_404(db, reservation_id)
     get_room_or_404(db, data.room_id)
@@ -75,7 +90,9 @@ def update_reservation(
 
 
 @router.delete("/{reservation_id}", status_code=204, summary="Elimina una reserva")
-def delete_reservation(reservation_id: int, db: Session = Depends(get_db)) -> None:
+def delete_reservation(
+    reservation_id: int, db: Annotated[Session, Depends(get_db)]
+) -> None:
     reservation = get_reservation_or_404(db, reservation_id)
     db.delete(reservation)
     db.commit()
